@@ -46,9 +46,9 @@ multiply = Relation3('multiply', _multiply)
 def _square(term_x: Term[int], term_x_squared: Term[int]) -> Result2[int, int]:
     match term_x, term_x_squared:
         case K(x), K(x_squared):
-            return Success([
-                (x, x_squared)
-            ])
+            return Success(
+                [(x, x_squared)] if x ** 2 == x_squared else []
+            )
 
         case K(x), IDK():
             return Success([

@@ -1,7 +1,8 @@
 from dataclasses import dataclass
-from typing import Any, Callable, Dict, List, Tuple, TypeVar, Generic
-from result import NotEnoughKnowns, Result1, Result2, Result3, Success
+from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple, TypeVar, Generic
+from result import NotEnoughKnowns, Result1, Result2, Result3, Success, UncountablyInfinite
 from functools import cmp_to_key
+from pprint import pprint
 
 T = TypeVar('T')
 
@@ -196,3 +197,95 @@ def number_of_unknowns(row: Row, assignments: Dict[str, Any]) -> int:
             return n
     
     return 0 # Never reached
+
+
+
+
+
+
+def isomorphism(name: str, f: Callable[[A], B], inverse_of_f: Callable[[B], A]) -> Relation2[A, B]:
+    def r(a_term: Term[A], b_term: Term[B]) -> Result2[A, B]:
+        match a_term, b_term:
+            case K(a), K(b):
+                return Success([(a, b)] if f(a) == b else [])
+
+            case K(a), IDK():
+                return Success([(a, f(a))])
+
+            case IDK(), K(b):
+                return Success([(inverse_of_f(b), b)])
+
+            case IDK(), IDK():
+                return NotEnoughKnowns()
+
+        return NotEnoughKnowns()
+
+    return Relation2(name, r)
+
+
+def involution(name: str, f: Callable[[A], A]) -> Relation2[A, A]:
+    return isomorphism(name, f, f)
+
+
+def query1(r: Relation1[A], optional_a: Optional[A]) -> None:
+    a_term = IDK('a') if optional_a is None else K(optional_a)
+
+    result = r.f(a_term)
+    
+    match result:
+        case NotEnoughKnowns():
+            print('Not enough knowns.')
+        case UncountablyInfinite():
+            print('Uncountably infinite.')
+        case Success(iterable):
+            for x in iterable:
+                pprint(x)
+                print()
+                b = input('ENTER to continue. q to stop: ')
+                if b == 'q':
+                    break
+            else:
+                print('Results exhausted.')
+
+def query2(r: Relation2[A, B], optional_a: Optional[A], optional_b: Optional[B]) -> None:
+    a_term = IDK('a') if optional_a is None else K(optional_a)
+    b_term = IDK('b') if optional_b is None else K(optional_b)
+
+    result = r.f(a_term, b_term)
+    
+    match result:
+        case NotEnoughKnowns():
+            print('Not enough knowns.')
+        case UncountablyInfinite():
+            print('Uncountably infinite.')
+        case Success(iterable):
+            for x in iterable:
+                pprint(x)
+                print()
+                b = input('ENTER to continue. q to stop: ')
+                if b == 'q':
+                    break
+            else:
+                print('Results exhausted.')
+
+def query3(r: Relation3[A, B, C], optional_a: Optional[A], optional_b: Optional[B], optional_c: Optional[C]) -> None:
+    a_term = IDK('a') if optional_a is None else K(optional_a)
+    b_term = IDK('b') if optional_b is None else K(optional_b)
+    c_term = IDK('c') if optional_c is None else K(optional_c)
+
+    result = r.f(a_term, b_term, c_term)
+    
+    match result:
+        case NotEnoughKnowns():
+            print('Not enough knowns.')
+        case UncountablyInfinite():
+            print('Uncountably infinite.')
+        case Success(iterable):
+            for x in iterable:
+                pprint(x)
+                print()
+                b = input('ENTER to continue. q to stop: ')
+                if b == 'q':
+                    break
+            else:
+                print('Results exhausted.')
