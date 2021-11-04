@@ -1,29 +1,39 @@
-from result import Result1, Result2, Result3
-from relation import IDK, K, Term
-from typing import List, Tuple, TypeVar
+from result import NotEnoughKnowns, Result1, Result2, Result3, Success, no_solutions
+from relation import IDK, K, Relation2, Term, involution
+from typing import Iterable, List, Tuple, TypeVar
 
 
 T = TypeVar('T')
 
-def nil(xs_term: Term[List[T]]) -> Result1[List[T]]:
+def isEmptyList(xs_term: Term[List[T]]) -> Result1[List[T]]: # Predicate: lessThan4(3). isHappy(brett).
     match xs_term:
         case K(xs):
-            pass
+            return Success([(xs,)] if len(xs) == 0 else [])
 
         case IDK():
-            pass
+            return Success([([],)])
+
+    return NotEnoughKnowns() # Never happens
 
 
-def cons(first_term: Term[T], rest_term: Term[List[T]], xs_term: Term[List[T]]) -> Result3[List[T], List[T], List[T]]:
+def cons(first: T, rest: List[T]) -> List[T]:
+    return [first] + rest 
+
+# []     = ... (y:ys)
+# (x:xs) = ...
+# [first, ...rest] = xs
+def _cons(first_term: Term[T], rest_term: Term[List[T]], xs_term: Term[List[T]]) -> Result3[T, List[T], List[T]]:
     match first_term, rest_term, xs_term:
         case K(first), K(rest), K(xs):
             pass
 
         case K(first), K(rest), IDK():
-            pass
+            xs = cons(first, rest)
+            return Success([(first, rest, xs)])
 
         case K(first), IDK(),   K(xs):
-            pass
+            rest = [] - first
+            return Success([(first, rest, xs)])
 
         case K(first), IDK(),   IDK():
             pass
@@ -35,7 +45,11 @@ def cons(first_term: Term[T], rest_term: Term[List[T]], xs_term: Term[List[T]]) 
             pass
 
         case IDK(),    IDK(),   K(xs):
-            pass
+            if len(xs) == 0:
+                # cons(_, _) can never give an empty list
+                return no_solutions()
+
+            return Success([(xs[0], xs[1:], xs)])
 
         case IDK(),    IDK(),   IDK():
             pass
@@ -66,24 +80,15 @@ def concat(xs_term: Term[List[T]], ys_term: Term[List[T]], concatenated_term: Te
         case IDK(), IDK(), IDK():
             pass
 
-def reverse(xs_term: Term[List[T]], reversed_term: Term[List[T]]) -> Result2[List[T], List[T]]:
-    match xs_term, reversed_term:
-        case K(xs), K(reversed):
-            pass
+def _reverse(x: List[T]) -> List[T]:
+    return list(reversed(x))
 
-        case K(xs), IDK():
-            pass
-
-        case IDK(), K(reversed):
-            pass
-
-        case IDK(), IDK():
-            pass
+reverse = involution("reverse", _reverse)
 
 X = TypeVar('X')
 Y = TypeVar('Y')
 
-def zip(xs_term: Term[List[X]], ys_term: Term[List[Y]], pairs_term: Term[List[Tuple[X, Y]]]) -> Result3[List[X], List[Y], List[Tuple[X, Y]]]:
+def zip2(xs_term: Term[List[X]], ys_term: Term[List[Y]], pairs_term: Term[List[Tuple[X, Y]]]) -> Result3[List[X], List[Y], List[Tuple[X, Y]]]:
     match xs_term, ys_term, pairs_term:
         case K(xs), K(ys), K(pairs):
             pass

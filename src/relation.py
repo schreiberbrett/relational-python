@@ -1,6 +1,6 @@
 from dataclasses import dataclass
-from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple, TypeVar, Generic
-from result import NotEnoughKnowns, Result1, Result2, Result3, Success, UncountablyInfinite
+from typing import Any, Callable, Dict, Iterable, List, Optional, Set, Tuple, TypeVar, Generic
+from result import NotEnoughKnowns, Result1, Result2, Result3, Success, UncountablyInfinite, no_solutions
 from functools import cmp_to_key
 from pprint import pprint
 
@@ -29,17 +29,17 @@ C = TypeVar('C')
 @dataclass(frozen=True)
 class Relation1(Generic[A]):
     name: str
-    f: Callable[[Term[A]], Result1[A]]
+    run: Callable[[Term[A]], Result1[A]]
 
 @dataclass(frozen=True)
 class Relation2(Generic[A, B]):
     name: str
-    f: Callable[[Term[A], Term[B]], Result2[A, B]]
+    run: Callable[[Term[A], Term[B]], Result2[A, B]]
 
 @dataclass(frozen=True)
 class Relation3(Generic[A, B, C]):
     name: str
-    f: Callable[[Term[A], Term[B], Term[C]], Result3[A, B, C]]
+    run: Callable[[Term[A], Term[B], Term[C]], Result3[A, B, C]]
 
 def from_list(list: List[A]) -> Relation1[A]:
     pass # TODO
@@ -90,6 +90,41 @@ class Row3:
 Row = Row1 | Row2 | Row3
 
 def solve3(rows: List[Row]) -> Result3[Any, Any, Any]:
+    if len(rows) == 0:
+        return no_solutions()
+    
+    if len(rows) == 1:
+        [row0] = rows
+
+        run_row(row0)
+
+        match row0:
+            case Row3(columns=(r, a, b, c)): # Must be the case in order to return a Result3
+                return r.run(a, b, c)
+
+
+    if len(rows) == 2:
+        [row0, row1] = rows
+
+        row0result = run_row(row0)
+
+        if isinstance(row0result, (NotEnoughKnowns, UncountablyInfinite)):
+            pass
+
+
+
+        match row0result:
+            case None:
+                pass
+
+
+
+
+
+
+
+
+
     return solve3_helper(rows, dict())
 
 
@@ -105,28 +140,90 @@ def solve3_helper(rows: List[Row], assignments: Dict[str, Any]) -> Result3[Any, 
 
     sorted_rows = sort_by_best_candidates(rows, assignments)
 
-    for prev, current, rest in window(sorted_rows):
-        result = NotEnoughKnowns
-        match current:
-            case Row1((r, a)):
-                result = r.f(get_term(a))
+    first_result = find_first_result(sorted_rows, assignments)
 
-            case Row2((r, a, b)):
-                result = r.f(get_term(a), get_term(b))
+    if first_result is None:
+        return NotEnoughKnowns()
 
-            case Row3((r, a, b, c)):
-                result = r.f(get_term(a), get_term(b), get_term(c))
+    for x in first_result.success.iterable:
+        new_assignments = determine_new_assignments(first_result.row, x)
 
-        if isinstance(result, Success):
-            break
-       
+        merged = dict(assignments, **new_assignments)
+
+        recursive_result = solve3_helper(first_result.rest_rows, merged)
+
+        if isinstance(recursive_result, Success):
+            yield from recursive_result # Yeah, yeah, it's only one branch for now. Take it.
+    else:
+        return NotEnoughKnowns()
+
+
+
+
+
+def determine_new_assignments(row: Row, x: Tuple[A] | Tuple[A, B] | Tuple[A, B, C]) -> Dict[str, A | B | C]:
+    new_assignments: Dict[str, Any] = dict()
+
+    match row.columns, x:
+        case (_, a_term), (a):
+            if isinstance(a_term, IDK):
+                new_assignments[a_term.tag] = a
+        
+        case (_, a_term, b_term), (a, b):
+            if isinstance(a_term, IDK):
+                new_assignments[a_term.tag] = a
+
+            if isinstance(b_term, IDK):
+                new_assignments[b_term.tag] = b
+
+        case (_, a_term, b_term, c_term), (a, b, c):
+            if isinstance(a_term, IDK):
+                new_assignments[a_term.tag] = a
+
+            if isinstance(b_term, IDK):
+                new_assignments[b_term.tag] = b
+
+            if isinstance(c_term, IDK):
+                new_assignments[c_term.tag] = c
+
+    return new_assignments
+
     
+    
+
+@dataclass
+class FirstResult():
+    row: Row
+    success: Success[Any]
+    rest_rows: List[Row]
+
+def find_first_result(rows: List[Row], assignments: Dict[str, Any]) -> Optional[FirstResult]:
+    '''Iterate through until one gives success. Returns `None` on no successes.'''
+
+    for prev, row, rest in window(rows):
+        result = run_row(row, assignments)
+        if isinstance(result, Success):
+            return FirstResult[Any](
+                my_row=row,
+                my_success=result,
+                rest_rows=prev + rest
+            )
+
+    return None
+
+
+def get_tags(row: Row) -> Set[str]:
+    tags: Set[str] = set()
+    for x in row.columns:
+        if isinstance(x, IDK):
+            tags.add(x.tag)
+    
+    return tags
 
 
 
 def window(xs: List[T]) -> List[Tuple[List[T], T, List[T]]]:
     return [(xs[:i], x, xs[(i + 1):]) for i, x in enumerate(xs)]
-
 
 def sort_by_best_candidates(rows: List[Row], assignments: Dict[str, Any]) -> List[Row]:
     """
@@ -200,9 +297,6 @@ def number_of_unknowns(row: Row, assignments: Dict[str, Any]) -> int:
 
 
 
-
-
-
 def isomorphism(name: str, f: Callable[[A], B], inverse_of_f: Callable[[B], A]) -> Relation2[A, B]:
     def r(a_term: Term[A], b_term: Term[B]) -> Result2[A, B]:
         match a_term, b_term:
@@ -230,7 +324,7 @@ def involution(name: str, f: Callable[[A], A]) -> Relation2[A, A]:
 def query1(r: Relation1[A], optional_a: Optional[A]) -> None:
     a_term = IDK('a') if optional_a is None else K(optional_a)
 
-    result = r.f(a_term)
+    result = r.run(a_term)
     
     match result:
         case NotEnoughKnowns():
@@ -251,7 +345,7 @@ def query2(r: Relation2[A, B], optional_a: Optional[A], optional_b: Optional[B])
     a_term = IDK('a') if optional_a is None else K(optional_a)
     b_term = IDK('b') if optional_b is None else K(optional_b)
 
-    result = r.f(a_term, b_term)
+    result = r.run(a_term, b_term)
     
     match result:
         case NotEnoughKnowns():
@@ -273,7 +367,7 @@ def query3(r: Relation3[A, B, C], optional_a: Optional[A], optional_b: Optional[
     b_term = IDK('b') if optional_b is None else K(optional_b)
     c_term = IDK('c') if optional_c is None else K(optional_c)
 
-    result = r.f(a_term, b_term, c_term)
+    result = r.run(a_term, b_term, c_term)
     
     match result:
         case NotEnoughKnowns():
@@ -289,3 +383,23 @@ def query3(r: Relation3[A, B, C], optional_a: Optional[A], optional_b: Optional[
                     break
             else:
                 print('Results exhausted.')
+
+
+def run_row(row: Row, assignments: Dict[str, Any] = dict()) -> Result1[Any] | Result2[Any, Any] | Result3[Any, Any, Any]:
+    def get_term(x: Term[A]) -> Term[A]:
+        if isinstance(x, IDK) and x.tag in assignments:
+            return K(assignments[x.tag])
+        else:
+            return x
+
+    match row:
+        case Row1(columns=(r, a)):
+            return r.run(get_term(a))
+
+        case Row2(columns=(r, a, b)):
+            return r.run(get_term(a), get_term(b))
+
+        case Row3(columns=(r, a, b, c)):
+            return r.run(get_term(a), get_term(b), get_term(c))
+
+    return NotEnoughKnowns() # Never happens
