@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from typing import Generic, Hashable, Iterator, List, Tuple, TypeVar, Generator
 from itertools import product
+from math import ceil
 
 A = TypeVar('A')
 B = TypeVar('B')
@@ -18,6 +19,29 @@ def ints() -> Iterator[int]:
         yield i
         yield -i
         i += 1
+
+
+def is_prime(n: int) -> bool:
+    if n < 2:
+        return False
+
+    # TODO: Use AKS
+
+    for i in range(2, int(n ** 0.5) + 1):
+        if n % i == 0:
+            return False
+
+    return True
+
+
+def primes() -> Iterator[int]:
+    # TODO: use computerphile Sieve of Eratosthenes
+    for i in nats():
+        if i == 0 or i == 1:
+            continue
+
+        if is_prime(i):
+            yield i
 
 def infproduct(iter_as: Iterator[A], iter_bs: Iterator[B]) -> Generator[Tuple[A, B], None, None]:
     past_as: List[A] = []

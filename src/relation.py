@@ -89,46 +89,10 @@ class Row3:
 
 Row = Row1 | Row2 | Row3
 
-def solve3(rows: List[Row]) -> Result3[Any, Any, Any]:
-    if len(rows) == 0:
-        return no_solutions()
-    
-    if len(rows) == 1:
-        [row0] = rows
+def solve(rows: List[Row]) -> NotEnoughKnowns | Iterable[Dict[str, Any]]:
+    return solve_helper(rows, dict())
 
-        run_row(row0)
-
-        match row0:
-            case Row3(columns=(r, a, b, c)): # Must be the case in order to return a Result3
-                return r.run(a, b, c)
-
-
-    if len(rows) == 2:
-        [row0, row1] = rows
-
-        row0result = run_row(row0)
-
-        if isinstance(row0result, (NotEnoughKnowns, UncountablyInfinite)):
-            pass
-
-
-
-        match row0result:
-            case None:
-                pass
-
-
-
-
-
-
-
-
-
-    return solve3_helper(rows, dict())
-
-
-def solve3_helper(rows: List[Row], assignments: Dict[str, Any]) -> Result3[Any, Any, Any]:
+def solve_helper(rows: List[Row], assignments: Dict[str, Any]) -> NotEnoughKnowns | Iterable[Dict[str, Any]]:
     def get_term(x: Term[A]) -> Term[A]:
         if isinstance(x, IDK) and x.tag in assignments:
             return K(assignments[x.tag])
@@ -136,7 +100,7 @@ def solve3_helper(rows: List[Row], assignments: Dict[str, Any]) -> Result3[Any, 
         return x
 
     if len(rows) == 0:
-        return Success([])
+        return [assignments]
 
     sorted_rows = sort_by_best_candidates(rows, assignments)
 
@@ -150,10 +114,15 @@ def solve3_helper(rows: List[Row], assignments: Dict[str, Any]) -> Result3[Any, 
 
         merged = dict(assignments, **new_assignments)
 
-        recursive_result = solve3_helper(first_result.rest_rows, merged)
+        recursive_result = solve_helper(first_result.rest_rows, merged)
 
-        if isinstance(recursive_result, Success):
-            yield from recursive_result # Yeah, yeah, it's only one branch for now. Take it.
+        if isinstance(recursive_result, Iterable):
+            def f():
+                yield from recursive_result
+
+            return f()
+
+            # yield from recursive_result # Yeah, yeah, it's only one branch for now. Take it.
     else:
         return NotEnoughKnowns()
 
@@ -188,8 +157,6 @@ def determine_new_assignments(row: Row, x: Tuple[A] | Tuple[A, B] | Tuple[A, B, 
 
     return new_assignments
 
-    
-    
 
 @dataclass
 class FirstResult():
@@ -203,9 +170,9 @@ def find_first_result(rows: List[Row], assignments: Dict[str, Any]) -> Optional[
     for prev, row, rest in window(rows):
         result = run_row(row, assignments)
         if isinstance(result, Success):
-            return FirstResult[Any](
-                my_row=row,
-                my_success=result,
+            return FirstResult(
+                row=row,
+                success=result,
                 rest_rows=prev + rest
             )
 
@@ -321,6 +288,29 @@ def involution(name: str, f: Callable[[A], A]) -> Relation2[A, A]:
     return isomorphism(name, f, f)
 
 
+def float_isomorphism(name: str, f: Callable[[float], float], g: Callable[[float], float]) -> Relation2[float, float]:
+    def r(a_term: Term[float], b_term: Term[float]) -> Result2[float, float]:
+        match a_term, b_term:
+            case K(a), K(b):
+                if f(a) == b: # TODO: float-near-equality
+                    return Success([(a, b)])
+                else:
+                    return no_solutions()
+
+            case K(a), IDK():
+                return Success([(a, f(a))])
+
+            case IDK(), K(b):
+                return Success([(g(b), b)])
+
+            case IDK(), IDK():
+                return NotEnoughKnowns()
+
+        return NotEnoughKnowns()
+
+    return Relation2(name, r)
+
+
 def query1(r: Relation1[A], optional_a: Optional[A]) -> None:
     a_term = IDK('a') if optional_a is None else K(optional_a)
 
@@ -403,3 +393,5 @@ def run_row(row: Row, assignments: Dict[str, Any] = dict()) -> Result1[Any] | Re
             return r.run(get_term(a), get_term(b), get_term(c))
 
     return NotEnoughKnowns() # Never happens
+
+

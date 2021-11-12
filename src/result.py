@@ -34,3 +34,13 @@ def singleton3(a: A, b: B, c: C) -> Result3[A, B, C]:
 
 def no_solutions():
     return Success([])
+
+def one_solution1(a: A) -> Result1[A]:
+    return Success([(a,)])
+
+def one_solution2(a: A, b: B) -> Result2[A, B]:
+    return Success([(a, b)])
+
+def one_solution3(a: A, b: B, c: C) -> Result3[A, B, C]:
+    return Success([(a, b, c)])
+
