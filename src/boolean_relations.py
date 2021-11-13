@@ -27,7 +27,7 @@ not_: Relation2[bool, bool] = from_pairs([
     (False, True)
 ])
 
-is_bool: Relation1[bool] = from_list([
+is_bool: Relation1[bool] = from_list("is_bool", [
     True,
     False
 ])

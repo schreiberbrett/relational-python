@@ -1,7 +1,6 @@
-from typing import Tuple
 from relation import Relation1, Relation2, Relation3, Term, K, IDK, float_isomorphism
-from result import Result1, Result2, Result3, NotEnoughKnowns, Success, no_solutions, one_solution1, one_solution3
-from util import Multiset, primes, ints, nats
+from result import Result1, Result2, Result3, NotEnoughKnowns, Success, no_solutions, one_solution1, one_solution2, one_solution3
+from util import Multiset, from_iterable, is_prime, primes, ints, nats
 
 import unittest
 
@@ -17,13 +16,15 @@ def _plus(term_a: Term[int], term_b: Term[int], term_c: Term[int]) -> Result3[in
             return Success([(a, c - a, c)])
         
         case K(a), IDK(), IDK():
-            return NotEnoughKnowns() # TODO: come back to this
+            # return Success((a, b, a + b) for b in ints()) # TODO: Should you do this
+            return NotEnoughKnowns()
     
         case IDK(), K(b), K(c):
             return Success([(c - b, b, c)])
 
         case IDK(), K(b), IDK():
-            return NotEnoughKnowns() # TODO: come back to this
+            # return Success((a, b, a + b) for a in ints()) # TODO: Should you do this
+            return NotEnoughKnowns()
 
         case IDK(a_tag), IDK(b_tag), K(c):
             if a_tag == b_tag and c % 2 == 0:
@@ -45,48 +46,30 @@ def _multiply(term_a: Term[int], term_b: Term[int], term_c: Term[int]) -> Result
 
         case K(a), K(b), IDK():
             c = a * b
-            return Success([(a, b, c)])
+            return one_solution3(a, b, c)
 
         case K(a), IDK(), K(c):
-            if c == 0:
-                if a == 0:
-                    def f():
-                        for b in ints():
-                            yield (a, b, c)
-                    return success(f())
-
-                else:
-                    b = 0
-                    return one_solution3(a, b, c)
+            if a == 0:
+                return one_solution3(0, 0, 0) if c == 0 else no_solutions()
 
             b = c / a
-
-            return one_solution3(a, b, c) if b.is_integer() else no_solutions()
+            return one_solution3(a, int(b), c) if b.is_integer() else no_solutions()
 
         case K(a), IDK(), IDK():
             return NotEnoughKnowns()
 
         case IDK(), K(0), K(0):
-            def f():
-                for a in ints():
-                    yield (a, 0, 0)
-            if b == 0:
-                if c == 0:
-                    def f():
-                        for a in ints():
-                            yield (a, b, c)
+            return Success((a, 0, 0) for a in ints())
 
         case IDK(), K(0), K(c):
             return no_solutions()
 
         case IDK(), K(b), K(c):
             a = c / b
-            return one_solution3(a, b, c) if a.is_integer() else no_solutions()
+            return one_solution3(int(a), b, c) if a.is_integer() else no_solutions()
 
         case IDK(), K(0), IDK():
-            def f():
-                for a in ints():
-                    yield (a, 0, 0)
+            return Success((a, 0, 0) for a in ints())
 
         case IDK(), K(b), IDK():
             return NotEnoughKnowns()
@@ -104,7 +87,7 @@ def _multiply(term_a: Term[int], term_b: Term[int], term_c: Term[int]) -> Result
                     return no_solutions()
                 x = c ** 0.5
                 if x.is_integer():
-                    return one_solution(x, x, c)
+                    return one_solution3(int(x), int(x), c)
                 else:
                     return no_solutions()
             else:
@@ -160,7 +143,12 @@ def _nat(n_term: Term[int]) -> Result1[int]:
             return one_solution1(n) if n >= 0 else no_solutions()
 
         case IDK():
-            return Success(nats())
+            def f():
+                for nat in nats():
+                    yield (nat,)
+            return Success(f())
+
+    return NotEnoughKnowns()
 
 nat = Relation1("nat", _nat)
 
@@ -170,7 +158,9 @@ def _prime(n_term: Term[int]) -> Result1[int]:
             return one_solution1(n) if is_prime(n) else no_solutions()
 
         case IDK():
-            return Success(primes())
+            return from_iterable(primes())
+
+    return NotEnoughKnowns()
 
 
 prime = Relation1("prime", _prime)
@@ -179,7 +169,7 @@ prime = Relation1("prime", _prime)
 
 class ArithmeticRelationsTest(unittest.TestCase):
     def test_twelve_squared_equals_what_integers(self):
-        result = square(K(12), IDK('_'))
+        result = square.run(K(12), IDK('_'))
         
         self.assertIsInstance(result, Success)
 
@@ -188,7 +178,7 @@ class ArithmeticRelationsTest(unittest.TestCase):
             self.assertListEqual(results, [(12, 144)])
 
     def test_what_integers_squared_equal_144(self):
-        result = square(IDK('_'), K(144))
+        result = square.run(IDK('_'), K(144))
         
         self.assertIsInstance(result, Success)
 
@@ -200,7 +190,7 @@ class ArithmeticRelationsTest(unittest.TestCase):
             self.assertEqual(len(results), 2)
 
     def test_what_integers_squared_equal_5(self):
-        result = square(IDK('_'), K(5))
+        result = square.run(IDK('_'), K(5))
         
         self.assertIsInstance(result, Success)
 

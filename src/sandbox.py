@@ -5,26 +5,25 @@ from set_relations import *
 from boolean_relations import *
 from util import *
 
-a = IDK('a')
-x = IDK('x')
-y = IDK('y')
-z = IDK('z')
-w = IDK('w')
+prime_a: Term[int] = IDK('prime_a')
+prime_b: Term[int] = IDK('prime_b')
 
-n = IDK('n')
-_2n = IDK('_2n')
+goldbach: List[Row] = [
+    Row1(prime, IDK('p1')),
+    Row1(prime, IDK('p2')),
 
-prime_a = IDK('prime_a')
-prime_b = IDK('prime_b')
-goldbach = [
-    Row3(multiply, n, K(2), _2n),
-    Row1(prime, prime_a),
-    Row1(prime, prime_b),
-    Row3(plus, prime_a, prime_b, _2n)
+    # Row1(prime, IDK('p1')),
+    # Row1(prime, IDK('p2')),
+    Row3(plus,  IDK('p1'), IDK('p2'), K(24)),
+
+
+    # definition of an even number
+    # Row1(nat, IDK('n')                    ),
+    # Row3(multiply, K(2), IDK('n'), IDK('2n'))
 ]
 
-for solution in solve(goldbach):
-    pprint(solution)
+solutions = solve(goldbach)
 
-
+if isinstance(solutions, Generator):
+    print_paced(solutions)
 

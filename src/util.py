@@ -1,24 +1,40 @@
 from dataclasses import dataclass
-from typing import Generic, Hashable, Iterator, List, Tuple, TypeVar, Generator
+from enum import Enum, auto
+from pprint import pprint
+from typing import Any, Generic, Hashable, Iterable, Iterator, List, Set, Tuple, TypeVar, Generator
 from itertools import product
-from math import ceil
+from random import shuffle
+
+from result import Success
 
 A = TypeVar('A')
 B = TypeVar('B')
 
-def nats() -> Iterator[int]:
+def nats():
     i = 0
     while True:
         yield i
         i += 1
 
-def ints() -> Iterator[int]:
+def ints():
     yield 0
     i = 1
     while True:
         yield i
         yield -i
         i += 1
+
+
+def spin_cycle(iters: List[Iterator[A]]) -> Generator[A, None, None]:
+    if len(iters) == 0:
+        return
+
+    i = 0
+    while True:
+        yield next(iters[i])
+        i += 1
+        if i == len(iters):
+            i = 0
 
 
 def is_prime(n: int) -> bool:
@@ -102,8 +118,161 @@ def infproduct_many(*iters: Iterator[A]) -> Generator[Tuple[A, ...], None, None]
                     state.out_of_values = True
 
 
+def from_iterable(iterable: Iterable[A]) -> Success[Tuple[A]]:
+    def f():
+        for i in iterable:
+            yield (i,)
+
+    return Success(f())
+
+
+
+
+
+
+
+
+
+class GeneratorState(Enum):
+    EXHAUSTED     = auto()
+    MAY_HAVE_MORE = auto()
+
+@dataclass
+class GeneratorAndState(Generic[A]):
+    iterator: Generator[A, None, None]
+    state: GeneratorState
+
+def flatten(generator_of_generators: Generator[Generator[A, None, None], None, None]) -> Generator[A, None, None]:
+    known_generators: List[GeneratorAndState[A]] = []
+    for inner_iterator in generator_of_generators:
+        known_generators.append(GeneratorAndState(inner_iterator, GeneratorState.MAY_HAVE_MORE))
+
+        # yield once from each of the known iterators
+        for x in known_generators:
+            try:
+                yield next(x.iterator)
+            except StopIteration:
+                x.state = GeneratorState.EXHAUSTED
+
+        # remove exhausted iterators
+        known_generators = [x for x in known_generators if x.state == GeneratorState.MAY_HAVE_MORE]
+
+    while len(known_generators) > 0:
+        # yield once from each of the known iterators
+        for x in known_generators:
+            try:
+                yield next(x.iterator)
+            except StopIteration:
+                x.state = GeneratorState.EXHAUSTED
+
+        # remove exhausted iterators
+        known_generators = [x for x in known_generators if x.state == GeneratorState.MAY_HAVE_MORE]        
+
+
+
+
+def mischief():
+    for nat in nats():
+        def inner():
+            for i in range(nat):
+                yield i
+        
+        yield inner()
+
+
+def print_paced(generator: Generator[Any, None, None]) -> None:
+    for x in generator:
+        pprint(x)
+        b = input('ENTER to continue. q to stop: ')
+        if b == 'q':
+            break
+
+def mischief2():
+    for x in [nats(), nats(), ints()]:
+        yield x
+
+
+
+
+
+
+
 
 H = TypeVar('H', bound=Hashable)
 
 class Multiset(Generic[H]):
     pass
+
+
+def flatten_uniques(generator_of_generators: Generator[Generator[H, None, None], None, None]) -> Generator[H, None, None]:
+    seen_results: Set[H] = set()
+    known_generators: List[GeneratorAndState[H]] = []
+    for inner_iterator in generator_of_generators:
+        known_generators.append(GeneratorAndState(inner_iterator, GeneratorState.MAY_HAVE_MORE))
+
+        # yield once from each of the known iterators
+        for x in known_generators:
+            try:
+                result = next(x.iterator)
+                if result not in seen_results:
+                    seen_results.add(result)
+                    yield result
+            except StopIteration:
+                x.state = GeneratorState.EXHAUSTED
+
+        # remove exhausted iterators
+        known_generators = [x for x in known_generators if x.state == GeneratorState.MAY_HAVE_MORE]
+
+    while len(known_generators) > 0:
+        # yield once from each of the known iterators
+        for x in known_generators:
+            try:
+                result = next(x.iterator)
+                if result not in seen_results:
+                    seen_results.add(result)
+                    yield result
+            except StopIteration:
+                x.state = GeneratorState.EXHAUSTED
+
+        # remove exhausted iterators
+        known_generators = [x for x in known_generators if x.state == GeneratorState.MAY_HAVE_MORE]        
+
+
+
+def flatten_uniques_random_pick(generator_of_generators: Generator[Generator[H, None, None], None, None]) -> Generator[H, None, None]:
+    seen_results: Set[H] = set()
+    known_generators: List[GeneratorAndState[H]] = []
+    for inner_iterator in generator_of_generators:
+        known_generators.append(GeneratorAndState(inner_iterator, GeneratorState.MAY_HAVE_MORE))
+
+        # yield once from each of the known iterators
+        for x in known_generators:
+            try:
+                result = next(x.iterator)
+                if result not in seen_results:
+                    seen_results.add(result)
+                    yield result
+            except StopIteration:
+                x.state = GeneratorState.EXHAUSTED
+
+        # remove exhausted iterators
+        known_generators = [x for x in known_generators if x.state == GeneratorState.MAY_HAVE_MORE]
+        shuffle(known_generators)
+
+    while len(known_generators) > 0:
+        # yield once from each of the known iterators
+        for x in known_generators:
+            try:
+                result = next(x.iterator)
+                if result not in seen_results:
+                    seen_results.add(result)
+                    yield result
+            except StopIteration:
+                x.state = GeneratorState.EXHAUSTED
+
+        # remove exhausted iterators
+        known_generators = [x for x in known_generators if x.state == GeneratorState.MAY_HAVE_MORE]
+        shuffle(known_generators)
+
+
+
